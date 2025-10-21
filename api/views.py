@@ -1,13 +1,13 @@
 from .serializers import StringAnalyzerSerializer
-from rest_framework.generics import CreateAPIView, ListAPIView, ListCreateAPIView
+from rest_framework.generics import CreateAPIView, ListAPIView, ListCreateAPIView, RetrieveAPIView
 from .models import StringAnalyzer
 from rest_framework.response import Response
 from rest_framework import status
 from .utils import status_error_code_displayer, get_sha256_hash, is_palindrome, unique_character, word_count, character_map
 from datetime import datetime, timezone
+from rest_framework.exceptions import NotFound
 
-# class StringAnalyzerListAPIView(ListAPIView):
-class StringAnalyzerListAPIView(ListCreateAPIView):
+class StringAnalyzerListAPIView(ListAPIView):
     queryset = StringAnalyzer.objects.all()
     serializer_class = StringAnalyzerSerializer
 
@@ -67,3 +67,23 @@ class StringAnalyzerCreateAPIView(CreateAPIView):
 
         serializer.save(id = hashed_value, properties = properties)
         return super().perform_create(serializer)
+    
+
+
+class StringAnalyzerDetailAPIView(RetrieveAPIView):
+    queryset = StringAnalyzer.objects.all()
+    serializer_class = StringAnalyzerSerializer
+    lookup_url_kwarg = 'value'
+    lookup_field = "value"
+
+    def retrieve(self, request, *args, **kwargs):
+        try:
+            instance = self.get_object()
+        except Exception:
+            return Response(
+                {status_error_code_displayer(404): "String does not exist in the system"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        serializer = self.get_serializer(instance)
+        return Response(serializer.data)
