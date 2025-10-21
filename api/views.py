@@ -1,5 +1,5 @@
 from .serializers import StringAnalyzerSerializer
-from rest_framework.generics import CreateAPIView, ListAPIView, ListCreateAPIView, RetrieveAPIView
+from rest_framework.generics import CreateAPIView, ListAPIView, ListCreateAPIView, RetrieveAPIView, RetrieveDestroyAPIView
 from .models import StringAnalyzer
 from rest_framework.response import Response
 from rest_framework import status
@@ -70,20 +70,19 @@ class StringAnalyzerCreateAPIView(CreateAPIView):
     
 
 
-class StringAnalyzerDetailAPIView(RetrieveAPIView):
+class StringAnalyzerDetailDestroyAPIView(RetrieveDestroyAPIView):
     queryset = StringAnalyzer.objects.all()
     serializer_class = StringAnalyzerSerializer
     lookup_url_kwarg = 'value'
     lookup_field = "value"
 
-    def retrieve(self, request, *args, **kwargs):
-        try:
-            instance = self.get_object()
-        except Exception:
+    def handle_exception(self, exc):
+        response =  super().handle_exception(exc)
+        if response is None or response.status_code == 404:
             return Response(
                 {status_error_code_displayer(404): "String does not exist in the system"},
                 status=status.HTTP_404_NOT_FOUND
             )
+        
+        return super().handle_exception(exc)
 
-        serializer = self.get_serializer(instance)
-        return Response(serializer.data)
