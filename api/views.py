@@ -39,10 +39,8 @@ class StringAnalyzerCreateAPIView(CreateAPIView):
                 {status_error_code_displayer(409): "String already exists in the system"},
                 status=status.HTTP_409_CONFLICT
             )
-            
-
         
-        serializer = self.get_serializer(data={"value":data["value"]})
+        serializer = self.get_serializer(data=data)
         serializer.is_valid(raise_exception=True)
 
         self.perform_create(serializer)
