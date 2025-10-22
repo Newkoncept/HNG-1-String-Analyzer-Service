@@ -3,7 +3,7 @@ from rest_framework.generics import CreateAPIView, ListAPIView, ListCreateAPIVie
 from .models import StringAnalyzer
 from rest_framework.response import Response
 from rest_framework import status
-from .utils import status_error_code_displayer, get_sha256_hash, is_palindrome, unique_character, word_count, character_map
+from .utils import status_error_code_displayer, get_sha256_hash, is_palindrome, unique_character, word_count, character_map, nlf
 from datetime import datetime, timezone
 from rest_framework.exceptions import NotFound
 from django.db.models import Q
@@ -71,6 +71,7 @@ class StringAnalyzerListAPIView(ListAPIView):
 class StringAnalyzerCreateAPIView(CreateAPIView):
     queryset = StringAnalyzer.objects.all()
     serializer_class = StringAnalyzerSerializer
+    
 
     def create(self, serializer):
 
@@ -142,3 +143,62 @@ class StringAnalyzerDetailDestroyAPIView(RetrieveDestroyAPIView):
         
         return super().handle_exception(exc)
 
+
+class StringAnalyzerNFLListAPIView(ListAPIView):
+    queryset = StringAnalyzer.objects.all()
+    serializer_class = StringAnalyzerSerializer
+
+    def get_queryset(self):
+        query = super().get_queryset()
+
+        if 'is_palindrome' in self.filters:
+            query = query.filter(properties__is_palindrome=self.filters['is_palindrome'])
+
+        if 'word_count' in self.filters:
+            query = query.filter(properties__word_count__exact=self.filters['word_count'])
+
+        if 'min_length' in self.filters:
+            query = query.filter(properties__length__gte=self.filters['min_length'])
+
+        if 'max_length' in self.filters:
+            query = query.filter(properties__length__lte=self.filters['max_length'])
+
+        if 'contains_character' in self.filters:
+            query = query.filter(value__icontains=self.filters['contains_character'])
+            
+        return query
+    
+    
+    def list(self, request, *args, **kwargs):
+        request_parameters = request.query_params
+        filters = nlf(request_parameters["query"])
+
+        if len(filters) > 0:
+                    # --- sanity/contradictions ---
+            if "min_length" in filters and "max_length" in filters:
+                return Response(
+                    {status_error_code_displayer(422): "Query parsed but resulted in conflicting filters"},
+                    status=status.HTTP_422_UNPROCESSABLE_ENTITY
+                )
+
+            else:
+                self.filters = filters
+                queryset = self.get_queryset()
+                serializer = self.get_serializer(queryset, many=True)
+
+                data = {
+                    "data" : serializer.data,\
+                    "count" : len(serializer.data),
+                    "interpreted query":  {
+                        "original": request_parameters["query"],
+                        "parsed_filters": filters
+                    }
+                }
+
+                return Response(data)
+        
+        else:
+            return Response(
+                {status_error_code_displayer(400): "Unable to parse natural language query"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
