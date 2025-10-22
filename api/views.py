@@ -1,49 +1,45 @@
 from .serializers import StringAnalyzerSerializer
-from rest_framework.generics import CreateAPIView, ListAPIView, ListCreateAPIView, RetrieveAPIView, RetrieveDestroyAPIView
+from rest_framework.generics import ListAPIView, ListCreateAPIView, RetrieveDestroyAPIView
 from .models import StringAnalyzer
 from rest_framework.response import Response
 from rest_framework import status
-from .utils import status_error_code_displayer, get_sha256_hash, is_palindrome, unique_character, word_count, character_map, nlf
+from .utils import status_error_code_displayer, get_sha256_hash, is_palindrome, unique_character, word_count, character_map, nlf, query_set_logic
 from datetime import datetime, timezone
 from rest_framework.exceptions import NotFound
 from django.db.models import Q
 
-class StringAnalyzerListAPIView(ListAPIView):
-    queryset = StringAnalyzer.objects.all()
+class StringAnalyzerListAndCreateAPIView(ListCreateAPIView):
     serializer_class = StringAnalyzerSerializer
 
-    def get_queryset(self):
-        query = super().get_queryset()
+    def base_get_queryset(self):
+        return StringAnalyzer.objects.all()
 
-        qs = query.filter(
-            properties__is_palindrome       = self.is_palindrome,
-            properties__length__gte         = self.min_length,
-            properties__length__lte         = self.max_length,                 
-            properties__word_count__exact   = self.word_count,          
-            value__icontains                = self.contains_character
-        )
+    def get_queryset(self):
+        query = self.base_get_queryset()
+
+        qs = query_set_logic(self, query)
     
         return qs
     
+
     def list(self, request, *args, **kwargs):
         
         request_parameters = request.query_params
-        expected_parameters = ["is_palindrome", "min_length", "max_length", "word_count", "contains_character"]
-
-        unknown = set(request_parameters.keys()) != set(expected_parameters)
-
-        if unknown:
-            return Response(
-                {status_error_code_displayer(400): "Invalid query parameter values or types"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        request_parameters_keys = request_parameters.keys()
         
         try:
-            self.is_palindrome = bool(request_parameters["is_palindrome"])
-            self.min_length = int(request_parameters["min_length"])
-            self.max_length = int(request_parameters["max_length"])
-            self.word_count = int(request_parameters["word_count"])
-            self.contains_character = str(request_parameters["contains_character"])
+            self.filters = {}
+            if "is_palindrome" in request_parameters_keys:
+                self.filters["is_palindrome" ] = bool(request_parameters["is_palindrome"])
+            if "min_length" in request_parameters_keys:
+                self.filters["min_length" ] = int(request_parameters["min_length"])
+            if "max_length" in request_parameters_keys:
+                self.filters["max_length" ] = int(request_parameters["max_length"])
+            if "word_count" in request_parameters_keys:
+                self.filters[ "word_count" ] = int(request_parameters["word_count"])
+            if "contains_character" in request_parameters_keys:
+                self.filters["contains_character"] =  str(request_parameters["contains_character"])
+
         except Exception as e:
             return Response(
                 {status_error_code_displayer(400): "Invalid query parameter values or types"
@@ -62,22 +58,10 @@ class StringAnalyzerListAPIView(ListAPIView):
         }
 
         return Response(data)
-
-
-        
-        # return super().list(request, *args, **kwargs)
     
-
-class StringAnalyzerCreateAPIView(CreateAPIView):
-    queryset = StringAnalyzer.objects.all()
-    serializer_class = StringAnalyzerSerializer
-    
-
-    def create(self, serializer):
+    def create(self, request, *args, **kwargs):
 
         data = self.request.data.copy()
-
-        # print(data)
 
 
         if "value" not in data.keys():
@@ -92,7 +76,7 @@ class StringAnalyzerCreateAPIView(CreateAPIView):
                 status=status.HTTP_422_UNPROCESSABLE_ENTITY
             )
         
-        if self.queryset.filter(value = data["value"]):
+        if self.base_get_queryset().filter(value = data["value"]):
             return Response(
                 {status_error_code_displayer(409): "String already exists in the system"},
                 status=status.HTTP_409_CONFLICT
@@ -112,8 +96,6 @@ class StringAnalyzerCreateAPIView(CreateAPIView):
         value = self.request.data["value"]
 
         hashed_value = get_sha256_hash(value)
-
-        id = hashed_value
         properties = {
             "length": len(value),
             "is_palindrome": is_palindrome(value),
@@ -124,9 +106,8 @@ class StringAnalyzerCreateAPIView(CreateAPIView):
         }
 
         serializer.save(id = hashed_value, properties = properties)
-        return super().perform_create(serializer)
-    
 
+    
 class StringAnalyzerDetailDestroyAPIView(RetrieveDestroyAPIView):
     queryset = StringAnalyzer.objects.all()
     serializer_class = StringAnalyzerSerializer
@@ -151,21 +132,8 @@ class StringAnalyzerNFLListAPIView(ListAPIView):
     def get_queryset(self):
         query = super().get_queryset()
 
-        if 'is_palindrome' in self.filters:
-            query = query.filter(properties__is_palindrome=self.filters['is_palindrome'])
+        query = query_set_logic(self, query)
 
-        if 'word_count' in self.filters:
-            query = query.filter(properties__word_count__exact=self.filters['word_count'])
-
-        if 'min_length' in self.filters:
-            query = query.filter(properties__length__gte=self.filters['min_length'])
-
-        if 'max_length' in self.filters:
-            query = query.filter(properties__length__lte=self.filters['max_length'])
-
-        if 'contains_character' in self.filters:
-            query = query.filter(value__icontains=self.filters['contains_character'])
-            
         return query
     
     
