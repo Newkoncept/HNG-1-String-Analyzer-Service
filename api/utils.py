@@ -125,7 +125,6 @@ def nlf(text):
 
 
 def query_set_logic(self, query):
-    print(self.filters)
     if 'is_palindrome' in self.filters:
         query = query.filter(properties__is_palindrome=self.filters['is_palindrome'])
 
