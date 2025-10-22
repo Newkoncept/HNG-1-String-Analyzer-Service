@@ -6,10 +6,67 @@ from rest_framework import status
 from .utils import status_error_code_displayer, get_sha256_hash, is_palindrome, unique_character, word_count, character_map
 from datetime import datetime, timezone
 from rest_framework.exceptions import NotFound
+from django.db.models import Q
 
 class StringAnalyzerListAPIView(ListAPIView):
     queryset = StringAnalyzer.objects.all()
     serializer_class = StringAnalyzerSerializer
+
+    def get_queryset(self):
+        query = super().get_queryset()
+
+        qs = query.filter(
+            properties__is_palindrome       = self.is_palindrome,
+            properties__length__gte         = self.min_length,
+            properties__length__lte         = self.max_length,                 
+            properties__word_count__exact   = self.word_count,          
+            value__icontains                = self.contains_character
+        )
+    
+        return qs
+    
+    def list(self, request, *args, **kwargs):
+        
+        request_parameters = request.query_params
+        expected_parameters = ["is_palindrome", "min_length", "max_length", "word_count", "contains_character"]
+
+        unknown = set(request_parameters.keys()) != set(expected_parameters)
+
+        if unknown:
+            return Response(
+                {status_error_code_displayer(400): "Invalid query parameter values or types"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            self.is_palindrome = bool(request_parameters["is_palindrome"])
+            self.min_length = int(request_parameters["min_length"])
+            self.max_length = int(request_parameters["max_length"])
+            self.word_count = int(request_parameters["word_count"])
+            self.contains_character = str(request_parameters["contains_character"])
+        except Exception as e:
+            return Response(
+                {status_error_code_displayer(400): "Invalid query parameter values or types"
+                 },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+
+        queryset = self.get_queryset()
+        serializer = self.get_serializer(queryset, many=True)
+
+        data = {
+            "data" : serializer.data,\
+            "count" : len(serializer.data),
+            "filter_applied": request_parameters
+        }
+
+        return Response(data)
+
+
+        
+        # return super().list(request, *args, **kwargs)
+    
 
 class StringAnalyzerCreateAPIView(CreateAPIView):
     queryset = StringAnalyzer.objects.all()
@@ -68,7 +125,6 @@ class StringAnalyzerCreateAPIView(CreateAPIView):
         serializer.save(id = hashed_value, properties = properties)
         return super().perform_create(serializer)
     
-
 
 class StringAnalyzerDetailDestroyAPIView(RetrieveDestroyAPIView):
     queryset = StringAnalyzer.objects.all()
