@@ -124,3 +124,21 @@ def nlf(text):
     return filters
 
 
+def query_set_logic(self, query):
+    print(self.filters)
+    if 'is_palindrome' in self.filters:
+        query = query.filter(properties__is_palindrome=self.filters['is_palindrome'])
+
+    if 'word_count' in self.filters:
+        query = query.filter(properties__word_count__exact=self.filters['word_count'])
+
+    if 'min_length' in self.filters:
+        query = query.filter(properties__length__gte=self.filters['min_length'])
+
+    if 'max_length' in self.filters:
+        query = query.filter(properties__length__lte=self.filters['max_length'])
+
+    if 'contains_character' in self.filters:
+        query = query.filter(value__icontains=self.filters['contains_character'])
+
+    return query
