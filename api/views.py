@@ -52,9 +52,9 @@ class StringAnalyzerListAndCreateAPIView(ListCreateAPIView):
         serializer = self.get_serializer(queryset, many=True)
 
         data = {
-            "data" : serializer.data,\
+            "data" : serializer.data,
             "count" : len(serializer.data),
-            "filter_applied": request_parameters
+            "filters_applied": request_parameters
         }
 
         return Response(data)
@@ -72,11 +72,11 @@ class StringAnalyzerListAndCreateAPIView(ListCreateAPIView):
         
         if not isinstance(data["value"], str): 
             return Response(
-                {status_error_code_displayer(422): "Invalid request body or missing 'value' field"},
+                {status_error_code_displayer(422): 'Invalid data type for "value" (must be string)'},
                 status=status.HTTP_422_UNPROCESSABLE_ENTITY
             )
         
-        if self.base_get_queryset().filter(value = data["value"]):
+        if self.base_get_queryset().filter(value = data["value"]).exists():
             return Response(
                 {status_error_code_displayer(409): "String already exists in the system"},
                 status=status.HTTP_409_CONFLICT
@@ -139,6 +139,15 @@ class StringAnalyzerNFLListAPIView(ListAPIView):
     
     def list(self, request, *args, **kwargs):
         request_parameters = request.query_params
+
+
+        if "query" not in request_parameters.keys():
+            return Response(
+                {status_error_code_displayer(400): "Unable to parse natural language query"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+
         filters = nlf(request_parameters["query"])
 
         if len(filters) > 0:
@@ -157,7 +166,7 @@ class StringAnalyzerNFLListAPIView(ListAPIView):
                 data = {
                     "data" : serializer.data,\
                     "count" : len(serializer.data),
-                    "interpreted query":  {
+                    "interpreted_query":  {
                         "original": request_parameters["query"],
                         "parsed_filters": filters
                     }
