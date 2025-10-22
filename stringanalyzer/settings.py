@@ -29,7 +29,7 @@ SECRET_KEY = env("SECRET_KEY")
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ["hng-1-string-analyzer-service-production.up.railway.app"]
+ALLOWED_HOSTS = ["hng-1-string-analyzer-service-production.up.railway.app", "*"]
 
 
 # Application definition
@@ -129,4 +129,8 @@ STATIC_URL = 'static/'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 
-APPEND_SLASH = False
+# APPEND_SLASH = False
+# settings.py
+REST_FRAMEWORK = {
+    'DEFAULT_ROUTER_TRAILING_SLASH': False,
+}
